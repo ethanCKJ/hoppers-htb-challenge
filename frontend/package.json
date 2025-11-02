@@ -14,7 +14,7 @@
     "@langchain/openai": "^1.0.0",
     "@tailwindcss/postcss": "^4.1.16",
     "bcrypt": "^6.0.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "16.6.1",
     "icons": "^1.0.0",
     "jsonwebtoken": "^9.0.2",
     "langchain": "^1.0.2",

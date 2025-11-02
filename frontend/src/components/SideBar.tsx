@@ -5,14 +5,12 @@ import { BiSearch } from "react-icons/bi";
 
 interface SideBarProps {
   filters: {
-    location: string;
     priceRange: number[];
     selectedCategories: string[];
     radius: number;
   };
   setFilters: React.Dispatch<
     React.SetStateAction<{
-      location: string;
       priceRange: number[];
       selectedCategories: string[];
       radius: number;
@@ -35,6 +33,7 @@ const SideBar: React.FC<SideBarProps> = ({
   const filteredCategories = availableCategories.filter((cat) =>
     cat.toLowerCase().includes(categoryQuery.toLowerCase())
   );
+
 
   const toggleCategory = (cat: string) => {
     setFilters((prev) => ({
@@ -149,7 +148,6 @@ const SideBar: React.FC<SideBarProps> = ({
       <button
         onClick={() =>
           setFilters({
-            location: "",
             priceRange: [minPrice, maxPrice],
             selectedCategories: [],
             radius: 5, // reset to default

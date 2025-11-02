@@ -56,7 +56,7 @@ export async function searchListings(
       LIMIT ${limit}
     `;
 
-    return results as SearchResult[];
+    return results as unknown as SearchResult[];
   } catch (error) {
     console.error("Vector search failed:", error);
     throw new Error("Vector search failed");
@@ -99,7 +99,7 @@ export async function searchListingsByCategory(
       LIMIT ${limit}
     `;
 
-    return results as SearchResult[];
+    return results as unknown as SearchResult[];
   } catch (error) {
     console.error("Category search failed:", error);
     throw new Error("Category search failed");

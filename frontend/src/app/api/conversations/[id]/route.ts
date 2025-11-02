@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import sql from "@/app/lib/postgres_client";
 import { getAuthenticatedUserId } from "@/app/lib/auth_user";
+import sql from "@/app/lib/postgres_client";
 
 /**
- * Close a conversation
- * Only the seller or buyer can close their own conversation
+ * Get a specific bot conversation with all messages
  */
-export async function PUT(
+export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // ✅ updated signature
 ) {
+  const { id: conversationId } = await context.params; // ✅ await params
+
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
   if (userIdOrResponse instanceof NextResponse) {
@@ -18,51 +19,85 @@ export async function PUT(
   const userId = userIdOrResponse;
 
   try {
-    const conversationId = (await params).id;
-    const { status } = await request.json();
-
-    // Validate status
-    if (status !== "closed") {
-      return NextResponse.json(
-        { error: "Only 'closed' status is supported" },
-        { status: 400 }
-      );
-    }
-
-    // Verify user is part of this conversation
+    // Verify ownership
     const conversations = await sql`
-      SELECT id, seller_id, buyer_id, status
-      FROM conversations
-      WHERE id = ${conversationId}
-      AND (seller_id = ${userId} OR buyer_id = ${userId})
+      SELECT id, created_at, updated_at
+      FROM bot_conversations
+      WHERE id = ${conversationId} AND user_id = ${userId}
     `;
 
     if (conversations.length === 0) {
       return NextResponse.json(
-        { error: "Conversation not found or access denied" },
+        { error: "Conversation not found" },
         { status: 404 }
       );
     }
 
-    // Update conversation status
-    const updatedConversations = await sql`
-      UPDATE conversations
-      SET
-        status = 'closed',
-        closed_at = NOW()
-      WHERE id = ${conversationId}
-      RETURNING id, status, closed_at
+    const conversation = conversations[0];
+
+    // Get all messages
+    const messages = await sql`
+      SELECT
+        id,
+        role,
+        content,
+        recommended_listings,
+        created_at
+      FROM bot_messages
+      WHERE conversation_id = ${conversationId}
+      ORDER BY created_at ASC
     `;
 
     return NextResponse.json(
-      {
-        message: "Conversation closed successfully",
-        conversation: updatedConversations[0],
-      },
+      { conversation, messages },
       { status: 200 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Failed to fetch bot conversation:", e);
+    return NextResponse.json(
+      { error: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Delete a bot conversation
+ */
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> } // ✅ updated signature
+) {
+  const { id: conversationId } = await context.params; // ✅ await params
+
+  // Authenticate user
+  const userIdOrResponse = getAuthenticatedUserId(request);
+  if (userIdOrResponse instanceof NextResponse) {
+    return userIdOrResponse;
+  }
+  const userId = userIdOrResponse;
+
+  try {
+    // Delete conversation (messages will cascade)
+    const result = await sql`
+      DELETE FROM bot_conversations
+      WHERE id = ${conversationId} AND user_id = ${userId}
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: "Conversation not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(
+      { message: "Conversation deleted successfully" },
+      { status: 200 }
+    );
+  } catch (e) {
+    console.error("Failed to delete bot conversation:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

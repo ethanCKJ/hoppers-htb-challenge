@@ -8,8 +8,11 @@ import { getAuthenticatedUserId } from "@/app/lib/auth_user";
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }   // ✅ new-style param type
 ) {
+  // ✅ Await params promise
+  const { id: listingId } = await context.params;
+
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
   if (userIdOrResponse instanceof NextResponse) {
@@ -18,16 +21,13 @@ export async function PUT(
   const userId = userIdOrResponse;
 
   try {
-    const listingId = params.id;
     const { status, buyer_id, category } = await request.json();
 
     // Validate status
     const validStatuses = ["active", "reserved", "sold", "withdrawn"];
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
-        {
-          error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-        },
+        { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
         { status: 400 }
       );
     }
@@ -81,10 +81,7 @@ export async function PUT(
     }
 
     return NextResponse.json(
-      {
-        message: "Listing updated successfully",
-        listing: updatedListings[0],
-      },
+      { message: "Listing updated successfully", listing: updatedListings[0] },
       { status: 200 }
     );
   } catch (e) {
@@ -101,11 +98,10 @@ export async function PUT(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> } // 👈 note: params is a Promise
+  context: { params: Promise<{ id: string }> } // ✅ already correct
 ) {
   try {
-    // ✅ Await the promise
-    const { id: listingId } = await params;
+    const { id: listingId } = await context.params;
 
     if (!listingId) {
       return NextResponse.json(
@@ -154,7 +150,6 @@ export async function GET(
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    // Increment view count (optional)
     await sql`
       UPDATE listings
       SET views_count = views_count + 1

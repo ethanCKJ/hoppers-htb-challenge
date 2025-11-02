@@ -7,7 +7,7 @@ import { getAuthenticatedUserId } from "@/app/lib/auth_user";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
@@ -17,7 +17,8 @@ export async function GET(
   const userId = userIdOrResponse;
 
   try {
-    const conversationId = (await params).id;
+    const { id } = await context.params;
+    const conversationId = id;
 
     // Verify user is part of this conversation
     const conversations = await sql`
@@ -103,7 +104,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
@@ -113,7 +114,8 @@ export async function POST(
   const userId = userIdOrResponse;
 
   try {
-    const conversationId = params.id;
+    const { id } = await context.params;
+    const conversationId = id;
     const { body, image_url } = await request.json();
 
     if (!body && !image_url) {

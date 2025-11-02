@@ -81,11 +81,12 @@ export default function Home() {
             .map((l: any) => l.category)
             .filter((c: string | null) => c && c.trim() !== "")
         )
-      ).sort();
+      ).sort() as string[];
+
+      setCategories(cats);
 
       setPriceBounds([min, max]);
       setFilters((prev) => ({ ...prev, priceRange: [min, max] }));
-      setCategories(cats);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Could not fetch price range.");

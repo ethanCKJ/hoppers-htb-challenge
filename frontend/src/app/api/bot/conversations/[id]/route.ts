@@ -7,7 +7,7 @@ import sql from "@/app/lib/postgres_client";
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } // ✅ updated signature
 ) {
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
@@ -17,7 +17,8 @@ export async function GET(
   const userId = userIdOrResponse;
 
   try {
-    const conversationId = (await params).id;
+    const { id } = await context.params;
+    const conversationId = id;
 
     // Verify ownership
     const conversations = await sql`
@@ -69,7 +70,7 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> } 
 ) {
   // Authenticate user
   const userIdOrResponse = getAuthenticatedUserId(request);
@@ -79,7 +80,8 @@ export async function DELETE(
   const userId = userIdOrResponse;
 
   try {
-    const conversationId = (await params).id;
+    const { id } = await context.params;
+    const conversationId = id;
 
     // Delete conversation (messages will cascade)
     const result = await sql`
