@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/app/lib/postgres_client";
 import { getAuthenticatedUserId } from "@/app/lib/auth_user";
+import { generateEmbedding, createListingSearchText } from "@/app/lib/embeddings";
 
 type CreateListingRequest = {
   title: string;
   description: string;
   price_pence: number;
+  category?: string;
   latitude?: number;
   longitude?: number;
   address?: string;
@@ -31,6 +33,7 @@ export async function POST(request: NextRequest) {
       title,
       description,
       price_pence,
+      category,
       latitude,
       longitude,
       address,
@@ -61,6 +64,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         price_pence,
+        category,
         latitude,
         longitude,
         address,
@@ -72,6 +76,7 @@ export async function POST(request: NextRequest) {
         ${title},
         ${description},
         ${price_pence},
+        ${category || null},
         ${latitude || null},
         ${longitude || null},
         ${address || null},
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
         ${hide_exact_location},
         'active'
       )
-      RETURNING id, seller_id, title, description, price_pence, status, created_at
+      RETURNING id, seller_id, title, description, price_pence, category, status, created_at
     `;
 
     const listing = listings[0];
@@ -104,6 +109,23 @@ export async function POST(request: NextRequest) {
           )
         `;
       }
+    }
+
+    // Generate and store embedding for vector search
+    try {
+      const searchText = createListingSearchText(title, description, category);
+      const embedding = await generateEmbedding(searchText);
+
+      await sql`
+        UPDATE listings
+        SET embedding = ${JSON.stringify(embedding)}::vector
+        WHERE id = ${listing.id}
+      `;
+
+      console.log(`✓ Vectorized listing: ${listing.id}`);
+    } catch (embeddingError) {
+      // Log error but don't fail the listing creation
+      console.error("Failed to generate embedding:", embeddingError);
     }
 
     return NextResponse.json(
