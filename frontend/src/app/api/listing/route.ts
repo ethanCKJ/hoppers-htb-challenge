@@ -5,18 +5,18 @@ import { getAuthenticatedUserId } from "@/app/lib/auth_user";
 type CreateListingRequest = {
   title: string;
   description: string;
+  category?: string; // ✅ added
   price_pence: number;
   latitude?: number;
   longitude?: number;
   address?: string;
   postcode?: string;
   hide_exact_location?: boolean;
-  images?: string[]; // Array of image filenames (e.g., ["image1.jpg", "image2.jpg"])
+  images?: string[]; // Array of image filenames
 };
 
 /**
- * Create a new listing
- * @param request
+ * 🧾 POST /api/listing — Create a new listing
  */
 export async function POST(request: NextRequest) {
   // Authenticate user
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       title,
       description,
       price_pence,
+      category,
       latitude,
       longitude,
       address,
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
         seller_id,
         title,
         description,
+        category,
         price_pence,
         latitude,
         longitude,
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
         ${userId},
         ${title},
         ${description},
+        ${category || null},
         ${price_pence},
         ${latitude || null},
         ${longitude || null},
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
         ${hide_exact_location},
         'active'
       )
-      RETURNING id, seller_id, title, description, price_pence, status, created_at
+      RETURNING id, seller_id, title, description, category, price_pence, status, created_at
     `;
 
     const listing = listings[0];
@@ -114,7 +117,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Error creating listing:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -123,8 +126,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Get listings with optional filters
- * @param request
+ * 🔍 GET /api/listing — Fetch listings with optional filters
  */
 export async function GET(request: NextRequest) {
   try {
@@ -135,6 +137,7 @@ export async function GET(request: NextRequest) {
     const keyword = searchParams.get("keyword");
     const maxPrice = searchParams.get("maxPrice");
     const minPrice = searchParams.get("minPrice");
+    const category = searchParams.get("category"); // ✅ added
 
     // Build dynamic query
     let query = `
@@ -143,6 +146,7 @@ export async function GET(request: NextRequest) {
         l.seller_id,
         l.title,
         l.description,
+        l.category,
         l.price_pence,
         l.latitude,
         l.longitude,
@@ -178,10 +182,17 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    // Add keyword search using full-text search
+    // Add keyword search
     if (keyword) {
       query += ` AND l.search_tsv @@ plainto_tsquery('simple', $${paramIndex})`;
       params.push(keyword);
+      paramIndex++;
+    }
+
+    // Add category filter
+    if (category) {
+      query += ` AND l.category ILIKE $${paramIndex}`;
+      params.push(category);
       paramIndex++;
     }
 
@@ -205,7 +216,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Group by and order
+    // Group and order
     query += `
       GROUP BY l.id
       ORDER BY l.created_at DESC
@@ -217,13 +228,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        listings: listings,
+        listings,
         count: listings.length,
       },
       { status: 200 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Error fetching listings:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -231,6 +242,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * ✏️ PUT /api/listing — Placeholder (unused)
+ */
 export async function PUT(request: NextRequest) {
-
+  return NextResponse.json(
+    { message: "Not implemented" },
+    { status: 405 }
+  );
 }

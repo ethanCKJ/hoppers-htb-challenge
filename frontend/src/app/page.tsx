@@ -6,7 +6,7 @@ import ListingsGrid from "@/components/Listings";
 import SideBar from "@/components/SideBar";
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3958.8; // Radius of Earth in miles
+  const R = 3958.8; // Earth radius in miles
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
   const a =
@@ -18,39 +18,50 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
-
 export default function Home() {
-  // 🧭 Shared filters state (start empty)
   const [filters, setFilters] = useState({
     priceRange: [0, 0],
     selectedCategories: [] as string[],
-    radius: 5, // ✅ new field (default 5 miles)
+    radius: 5,
   });
 
-
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
-  const [priceBounds, setPriceBounds] = useState<[number, number]>([0, 0]); // store lowest + highest price in DB
+  const [priceBounds, setPriceBounds] = useState<[number, number]>([0, 0]);
   const [listings, setListings] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [userId, setUserId] = useState<string | null>(null); // ✅ new
 
-
+  // 📍 Get user location
   useEffect(() => {
-    // Get user's current position (if allowed)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (pos) =>
         setUserLocation({
           lat: pos.coords.latitude,
           lon: pos.coords.longitude,
-        });
-      },
+        }),
       (err) => console.warn("Could not get location:", err),
       { enableHighAccuracy: true }
     );
   }, []);
 
+  // 👤 Fetch current user ID once
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch("/api/user", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.user?.id) setUserId(data.user.id);
+      } catch (err) {
+        console.warn("No logged-in user found.");
+      }
+    };
+    fetchUser();
+  }, []);
 
-  // 🧮 Fetch min and max prices once on page load
+  // 🧮 Fetch min/max + categories
   const fetchPriceRange = async () => {
     try {
       const res = await fetch("/api/listing");
@@ -58,20 +69,28 @@ export default function Home() {
 
       if (!res.ok) throw new Error(data.error || "Failed to fetch listings");
 
-      // Extract min and max prices from data
       const prices = data.listings.map((l: any) => l.price_pence / 100);
       const min = Math.min(...prices);
       const max = Math.max(...prices);
 
+      const cats = Array.from(
+        new Set(
+          data.listings
+            .map((l: any) => l.category)
+            .filter((c: string | null) => c && c.trim() !== "")
+        )
+      ).sort();
+
       setPriceBounds([min, max]);
       setFilters((prev) => ({ ...prev, priceRange: [min, max] }));
+      setCategories(cats);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Could not fetch price range.");
     }
   };
 
-  // 🔄 Fetch listings with applied filters
+  // 🔄 Fetch listings (with filters)
   const fetchListings = async () => {
     try {
       setLoading(true);
@@ -82,30 +101,40 @@ export default function Home() {
         params.append("minPrice", String(filters.priceRange[0] * 100));
       if (filters.priceRange[1] > 0)
         params.append("maxPrice", String(filters.priceRange[1] * 100));
-      if (filters.radius > 0)
-        params.append("radius", String(filters.radius));
 
       const res = await fetch(`/api/listing?${params.toString()}`);
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || "Failed to fetch listings");
 
       let allListings = data.listings || [];
-      // 🧮 If user location and radius are set, filter locally
+
+      // 🚫 Exclude listings by logged-in user
+      if (userId) {
+        allListings = allListings.filter((l: any) => l.seller_id !== userId);
+      }
+
+      // 📍 Apply radius filter (frontend)
       if (userLocation && filters.radius > 0) {
         allListings = allListings.filter((l: any) => {
           if (!l.latitude || !l.longitude) return false;
-          const distance = haversineDistance(
+          const dist = haversineDistance(
             userLocation.lat,
             userLocation.lon,
             l.latitude,
             l.longitude
           );
-          return distance <= filters.radius;
+          return dist <= filters.radius;
         });
       }
-      setListings(allListings);
 
+      // 🏷️ Category filter
+      if (filters.selectedCategories.length > 0) {
+        allListings = allListings.filter((l: any) =>
+          filters.selectedCategories.includes(l.category)
+        );
+      }
+
+      setListings(allListings);
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong.");
@@ -114,15 +143,15 @@ export default function Home() {
     }
   };
 
-  // Fetch lowest/highest prices on mount
+  // Initial data load
   useEffect(() => {
     fetchPriceRange();
   }, []);
 
-  // Refetch listings whenever filters change (after bounds are loaded)
+  // Refetch whenever filters or userId change
   useEffect(() => {
     if (priceBounds[1] > 0) fetchListings();
-  }, [filters]);
+  }, [filters, userId]);
 
   return (
     <main className="min-h-screen min-w-screen flex">
@@ -136,6 +165,7 @@ export default function Home() {
                 setFilters={setFilters}
                 minPrice={priceBounds[0]}
                 maxPrice={priceBounds[1]}
+                availableCategories={categories}
               />
             ) : (
               <div className="p-8 text-gray-500">Loading filters...</div>
