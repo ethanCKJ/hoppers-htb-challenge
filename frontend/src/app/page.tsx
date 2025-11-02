@@ -1,64 +1,81 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import HeadBar from "@/components/HeadBar";
 import ListingsGrid from "@/components/Listings";
 import SideBar from "@/components/SideBar";
 
 export default function Home() {
-  // Shared filters state
+  // 🧭 Shared filters state (start empty; will fill once min/max are fetched)
   const [filters, setFilters] = useState({
     location: "",
-    priceRange: [0, 200],
+    priceRange: [0, 0],
     selectedCategories: [] as string[],
   });
 
-  // Mock data (replace with API later)
-  const listings = [
-    {
-      id: 1,
-      title: "Laptop for Sale",
-      price: 450,
-      location: "Sheffield",
-      category: "Electronics",
-      imageUrl: "/mock/laptop.jpg",
-    },
-    {
-      id: 2,
-      title: "Used Textbooks Bundle",
-      price: 30,
-      location: "Manchester",
-      category: "Books",
-      imageUrl: "/mock/books.jpg",
-    },
-    {
-      id: 3,
-      title: "Gaming Chair",
-      price: 80,
-      location: "Sheffield",
-      category: "Furniture",
-      imageUrl: "/mock/chair.jpg",
-    },
-  ];
+  const [priceBounds, setPriceBounds] = useState<[number, number]>([0, 0]); // store lowest + highest price in DB
+  const [listings, setListings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // ✅ Correct filtering logic
-  const filteredListings = useMemo(() => {
-    return listings.filter((listing) => {
-      const matchLocation =
-        !filters.location ||
-        listing.location.toLowerCase().includes(filters.location.toLowerCase());
+  // 🧮 Fetch min and max prices once on page load
+  const fetchPriceRange = async () => {
+    try {
+      const res = await fetch("/api/listing");
+      const data = await res.json();
 
-      const matchPrice =
-        listing.price >= filters.priceRange[0] &&
-        listing.price <= filters.priceRange[1];
+      if (!res.ok) throw new Error(data.error || "Failed to fetch listings");
 
-      const matchCategory =
-        filters.selectedCategories.length === 0 ||
-        filters.selectedCategories.includes(listing.category);
+      // Extract min and max prices from data
+      const prices = data.listings.map((l: any) => l.price_pence / 100);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
 
-      return matchLocation && matchPrice && matchCategory;
-    });
-  }, [filters, listings]);
+      setPriceBounds([min, max]);
+      setFilters((prev) => ({ ...prev, priceRange: [min, max] }));
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Could not fetch price range.");
+    }
+  };
+
+  // 🔄 Fetch listings with applied filters
+  const fetchListings = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const params = new URLSearchParams();
+
+      if (filters.location) params.append("keyword", filters.location);
+      if (filters.priceRange[0] > 0)
+        params.append("minPrice", String(filters.priceRange[0] * 100));
+      if (filters.priceRange[1] > 0)
+        params.append("maxPrice", String(filters.priceRange[1] * 100));
+
+      const res = await fetch(`/api/listing?${params.toString()}`);
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed to fetch listings");
+
+      setListings(data.listings || []);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch lowest/highest prices on mount
+  useEffect(() => {
+    fetchPriceRange();
+  }, []);
+
+  // Refetch listings whenever filters change (after bounds are loaded)
+  useEffect(() => {
+    if (priceBounds[1] > 0) fetchListings();
+  }, [filters]);
 
   return (
     <main className="min-h-screen min-w-screen flex">
@@ -66,11 +83,42 @@ export default function Home() {
         <HeadBar />
         <div className="flex flex-row h-full">
           <div className="flex w-fit">
-            <SideBar filters={filters} setFilters={setFilters} />
+            {priceBounds[1] > 0 ? (
+              <SideBar
+                filters={filters}
+                setFilters={setFilters}
+                minPrice={priceBounds[0]}
+                maxPrice={priceBounds[1]}
+              />
+            ) : (
+              <div className="p-8 text-gray-500">Loading filters...</div>
+            )}
           </div>
 
           <div className="flex w-full">
-            <ListingsGrid listings={filteredListings} />
+            {loading ? (
+              <div className="w-full flex items-center justify-center text-gray-500 text-lg">
+                Loading listings...
+              </div>
+            ) : error ? (
+              <div className="w-full flex items-center justify-center text-red-500 text-lg">
+                {error}
+              </div>
+            ) : (
+              <ListingsGrid
+                listings={listings.map((l) => ({
+                  id: l.id,
+                  title: l.title,
+                  price: l.price_pence / 100,
+                  location: l.address || l.postcode || "Unknown",
+                  category: l.category || "Uncategorized",
+                  imageUrl:
+                    l.images && l.images.length > 0
+                      ? l.images[0].url
+                      : "/window.svg",
+                }))}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -16,9 +16,16 @@ interface SideBarProps {
       selectedCategories: string[];
     }>
   >;
+  minPrice: number; // ✅ new prop
+  maxPrice: number; // ✅ new prop
 }
 
-const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
+const SideBar: React.FC<SideBarProps> = ({
+  filters,
+  setFilters,
+  minPrice,
+  maxPrice,
+}) => {
   const [categoryQuery, setCategoryQuery] = useState("");
 
   const availableCategories = [
@@ -64,7 +71,7 @@ const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
         </div>
 
         {filters.location && (
-          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg max-h-32 overflow-y-auto text-sm ">
+          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg max-h-32 overflow-y-auto text-sm">
             {["Sheffield", "Manchester", "Leeds", "Nottingham"]
               .filter((loc) =>
                 loc.toLowerCase().includes(filters.location.toLowerCase())
@@ -89,10 +96,11 @@ const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
         <h2 className="text-lg font-medium text-gray-700 mb-2">
           Price Range (£)
         </h2>
+
         <div className="flex items-center gap-2">
           <input
             type="number"
-            min={0}
+            min={minPrice}
             max={filters.priceRange[1]}
             value={filters.priceRange[0]}
             onChange={(e) =>
@@ -107,7 +115,7 @@ const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
           <input
             type="number"
             min={filters.priceRange[0]}
-            max={500}
+            max={maxPrice}
             value={filters.priceRange[1]}
             onChange={(e) =>
               setFilters((prev) => ({
@@ -118,6 +126,10 @@ const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
             className="w-16 border border-gray-300 rounded-md text-center"
           />
         </div>
+
+        <p className="text-sm text-gray-500 mt-1">
+          Min: £{minPrice.toFixed(2)} | Max: £{maxPrice.toFixed(2)}
+        </p>
       </div>
 
       {/* 🏷️ Category Filter */}
@@ -157,7 +169,7 @@ const SideBar: React.FC<SideBarProps> = ({ filters, setFilters }) => {
         onClick={() =>
           setFilters({
             location: "",
-            priceRange: [0, 200],
+            priceRange: [minPrice, maxPrice],
             selectedCategories: [],
           })
         }
