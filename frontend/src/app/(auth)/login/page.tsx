@@ -37,8 +37,8 @@ const LoginPage = () => {
 
       if (!res.ok) throw new Error(data.error || "Login failed");
 
-      // ✅ Success → redirect user to /home
-      router.push("/home");
+      // ✅ Success → redirect user to /
+      router.push("/");
     } catch (err: any) {
       setError(err.message || "Something went wrong. Try again.");
     } finally {
