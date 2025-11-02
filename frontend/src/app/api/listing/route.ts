@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/app/lib/postgres_client";
 import { getAuthenticatedUserId } from "@/app/lib/auth_user";
-import { generateEmbedding, createListingSearchText } from "@/app/lib/embeddings";
 
 type CreateListingRequest = {
   title: string;
   description: string;
+  category?: string; // ✅ added
   price_pence: number;
-  category?: string;
   latitude?: number;
   longitude?: number;
   address?: string;
   postcode?: string;
   hide_exact_location?: boolean;
-  images?: string[]; // Array of image filenames (e.g., ["image1.jpg", "image2.jpg"])
+  images?: string[]; // Array of image filenames
 };
 
 /**
- * Create a new listing
- * @param request
+ * 🧾 POST /api/listing — Create a new listing
  */
 export async function POST(request: NextRequest) {
   // Authenticate user
@@ -63,8 +61,8 @@ export async function POST(request: NextRequest) {
         seller_id,
         title,
         description,
-        price_pence,
         category,
+        price_pence,
         latitude,
         longitude,
         address,
@@ -75,8 +73,8 @@ export async function POST(request: NextRequest) {
         ${userId},
         ${title},
         ${description},
-        ${price_pence},
         ${category || null},
+        ${price_pence},
         ${latitude || null},
         ${longitude || null},
         ${address || null},
@@ -84,7 +82,7 @@ export async function POST(request: NextRequest) {
         ${hide_exact_location},
         'active'
       )
-      RETURNING id, seller_id, title, description, price_pence, category, status, created_at
+      RETURNING id, seller_id, title, description, category, price_pence, status, created_at
     `;
 
     const listing = listings[0];
@@ -111,23 +109,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate and store embedding for vector search
-    try {
-      const searchText = createListingSearchText(title, description, category);
-      const embedding = await generateEmbedding(searchText);
-
-      await sql`
-        UPDATE listings
-        SET embedding = ${JSON.stringify(embedding)}::vector
-        WHERE id = ${listing.id}
-      `;
-
-      console.log(`✓ Vectorized listing: ${listing.id}`);
-    } catch (embeddingError) {
-      // Log error but don't fail the listing creation
-      console.error("Failed to generate embedding:", embeddingError);
-    }
-
     return NextResponse.json(
       {
         message: "Listing created successfully",
@@ -136,7 +117,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Error creating listing:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -145,8 +126,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Get listings with optional filters
- * @param request
+ * 🔍 GET /api/listing — Fetch listings with optional filters
  */
 export async function GET(request: NextRequest) {
   try {
@@ -157,6 +137,7 @@ export async function GET(request: NextRequest) {
     const keyword = searchParams.get("keyword");
     const maxPrice = searchParams.get("maxPrice");
     const minPrice = searchParams.get("minPrice");
+    const category = searchParams.get("category"); // ✅ added
 
     // Build dynamic query
     let query = `
@@ -165,6 +146,7 @@ export async function GET(request: NextRequest) {
         l.seller_id,
         l.title,
         l.description,
+        l.category,
         l.price_pence,
         l.latitude,
         l.longitude,
@@ -200,10 +182,17 @@ export async function GET(request: NextRequest) {
       paramIndex++;
     }
 
-    // Add keyword search using full-text search
+    // Add keyword search
     if (keyword) {
       query += ` AND l.search_tsv @@ plainto_tsquery('simple', $${paramIndex})`;
       params.push(keyword);
+      paramIndex++;
+    }
+
+    // Add category filter
+    if (category) {
+      query += ` AND l.category ILIKE $${paramIndex}`;
+      params.push(category);
       paramIndex++;
     }
 
@@ -227,7 +216,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Group by and order
+    // Group and order
     query += `
       GROUP BY l.id
       ORDER BY l.created_at DESC
@@ -239,13 +228,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        listings: listings,
+        listings,
         count: listings.length,
       },
       { status: 200 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Error fetching listings:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -253,6 +242,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * ✏️ PUT /api/listing — Placeholder (unused)
+ */
 export async function PUT(request: NextRequest) {
-
+  return NextResponse.json(
+    { message: "Not implemented" },
+    { status: 405 }
+  );
 }
