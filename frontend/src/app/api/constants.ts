@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 // Initialize OpenAI client
 export const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "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",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Model constants
