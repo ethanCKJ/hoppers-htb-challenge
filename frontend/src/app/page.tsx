@@ -5,18 +5,50 @@ import HeadBar from "@/components/HeadBar";
 import ListingsGrid from "@/components/Listings";
 import SideBar from "@/components/SideBar";
 
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 3958.8; // Radius of Earth in miles
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+
 export default function Home() {
-  // 🧭 Shared filters state (start empty; will fill once min/max are fetched)
+  // 🧭 Shared filters state (start empty)
   const [filters, setFilters] = useState({
-    location: "",
     priceRange: [0, 0],
     selectedCategories: [] as string[],
+    radius: 5, // ✅ new field (default 5 miles)
   });
 
+
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [priceBounds, setPriceBounds] = useState<[number, number]>([0, 0]); // store lowest + highest price in DB
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+
+  useEffect(() => {
+    // Get user's current position (if allowed)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        });
+      },
+      (err) => console.warn("Could not get location:", err),
+      { enableHighAccuracy: true }
+    );
+  }, []);
+
 
   // 🧮 Fetch min and max prices once on page load
   const fetchPriceRange = async () => {
@@ -46,19 +78,34 @@ export default function Home() {
       setError("");
 
       const params = new URLSearchParams();
-
-      if (filters.location) params.append("keyword", filters.location);
       if (filters.priceRange[0] > 0)
         params.append("minPrice", String(filters.priceRange[0] * 100));
       if (filters.priceRange[1] > 0)
         params.append("maxPrice", String(filters.priceRange[1] * 100));
+      if (filters.radius > 0)
+        params.append("radius", String(filters.radius));
 
       const res = await fetch(`/api/listing?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || "Failed to fetch listings");
 
-      setListings(data.listings || []);
+      let allListings = data.listings || [];
+      // 🧮 If user location and radius are set, filter locally
+      if (userLocation && filters.radius > 0) {
+        allListings = allListings.filter((l: any) => {
+          if (!l.latitude || !l.longitude) return false;
+          const distance = haversineDistance(
+            userLocation.lat,
+            userLocation.lon,
+            l.latitude,
+            l.longitude
+          );
+          return distance <= filters.radius;
+        });
+      }
+      setListings(allListings);
+
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Something went wrong.");

@@ -8,16 +8,18 @@ interface SideBarProps {
     location: string;
     priceRange: number[];
     selectedCategories: string[];
+    radius: number;
   };
   setFilters: React.Dispatch<
     React.SetStateAction<{
       location: string;
       priceRange: number[];
       selectedCategories: string[];
+      radius: number;
     }>
   >;
-  minPrice: number; // ✅ new prop
-  maxPrice: number; // ✅ new prop
+  minPrice: number;
+  maxPrice: number;
 }
 
 const SideBar: React.FC<SideBarProps> = ({
@@ -54,41 +56,27 @@ const SideBar: React.FC<SideBarProps> = ({
     <aside className="flex flex-col w-full sm:w-72 bg-white shadow-lg p-5 h-full">
       <h1 className="text-3xl font-semibold text-gray-800 mb-3">Filters</h1>
 
-      {/* 📍 Location Filter */}
-      <div>
-        <h2 className="text-lg font-medium text-gray-700 mb-2">Location</h2>
-        <div className="flex items-center border border-gray-300 rounded-lg px-3 py-2 mb-4">
-          <BiSearch size={20} className="text-gray-500 mr-2" />
-          <input
-            type="text"
-            placeholder="Search location..."
-            value={filters.location}
-            onChange={(e) =>
-              setFilters((prev) => ({ ...prev, location: e.target.value }))
-            }
-            className="w-full focus:outline-none text-gray-700"
-          />
-        </div>
-
-        {filters.location && (
-          <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg max-h-32 overflow-y-auto text-sm">
-            {["Sheffield", "Manchester", "Leeds", "Nottingham"]
-              .filter((loc) =>
-                loc.toLowerCase().includes(filters.location.toLowerCase())
-              )
-              .map((loc) => (
-                <div
-                  key={loc}
-                  className="p-2 hover:bg-blue-100 cursor-pointer rounded-md"
-                  onClick={() =>
-                    setFilters((prev) => ({ ...prev, location: loc }))
-                  }
-                >
-                  {loc}
-                </div>
-              ))}
-          </div>
-        )}
+      {/* 📍 Distance Filter */}
+      <div className="mb-4">
+        <h2 className="text-lg font-medium text-gray-700 mb-2">
+          Distance from you
+        </h2>
+        <select
+          value={filters.radius}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              radius: Number(e.target.value),
+            }))
+          }
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none text-gray-700 bg-white"
+        >
+          <option value={5}>Within 5 miles</option>
+          <option value={10}>Within 10 miles</option>
+          <option value={15}>Within 15 miles</option>
+          <option value={20}>Within 20 miles</option>
+          <option value={0}>All</option>
+        </select>
       </div>
 
       {/* 💰 Price Filter */}
@@ -171,6 +159,7 @@ const SideBar: React.FC<SideBarProps> = ({
             location: "",
             priceRange: [minPrice, maxPrice],
             selectedCategories: [],
+            radius: 5, // reset to default
           })
         }
         className="mt-4 text-blue-600 font-semibold hover:underline self-start"
