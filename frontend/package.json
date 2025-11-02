@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.16",
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.2",
     "next": "16.0.1",
     "postcss": "^8.5.6",
     "postgre": "^0.1.8",
@@ -19,6 +21,8 @@
     "tailwindcss": "^4.1.16"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
