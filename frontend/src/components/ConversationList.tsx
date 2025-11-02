@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { BiUser, BiPackage, BiChat } from "react-icons/bi";
 import type { Conversation } from "./InboxModal";
 
@@ -17,6 +17,13 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onSelectConversation,
   loading,
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    // mark component as mounted so we only render time-sensitive values on the client
+    // defer setState to the next tick to avoid synchronous state update in effect
+    const t = setTimeout(() => setIsMounted(true), 0);
+    return () => clearTimeout(t);
+  }, []);
   const formatPrice = (pricePence: number) => {
     return `£${(pricePence / 100).toFixed(2)}`;
   };
@@ -72,7 +79,8 @@ const ConversationList: React.FC<ConversationListProps> = ({
           <div className="flex items-center gap-1 mt-1">
             <BiUser size={16} className="text-gray-500" />
             <p className="text-sm text-gray-600">
-              {conversation.other_party_name} <span className="text-gray-400">{roleLabel}</span>
+              {conversation.other_party_name}{" "}
+              <span className="text-gray-400">{roleLabel}</span>
             </p>
           </div>
 
@@ -91,7 +99,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
 
         {/* Timestamp */}
         <div className="flex-shrink-0 text-xs text-gray-400">
-          {conversation.last_message_at && formatTimestamp(conversation.last_message_at)}
+          {conversation.last_message_at && (isMounted ? formatTimestamp(conversation.last_message_at) : "")}
         </div>
       </div>
     );
@@ -113,7 +121,9 @@ const ConversationList: React.FC<ConversationListProps> = ({
       <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
         <BiChat size={64} className="text-gray-300 mb-4" />
         <p className="text-lg">No conversations yet</p>
-        <p className="text-sm">Start chatting with sellers to see conversations here</p>
+        <p className="text-sm">
+          Start chatting with sellers to see conversations here
+        </p>
       </div>
     );
   }
