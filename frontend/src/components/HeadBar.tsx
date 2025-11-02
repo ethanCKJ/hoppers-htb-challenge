@@ -8,12 +8,17 @@ import {
   BiEnvelope,
   BiUser,
   BiPlus,
+  BiBot,
 } from "react-icons/bi";
 import InboxModal from "./InboxModal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const HeadBar = () => {
+interface HeadBarProps {
+  onChatOpen?: () => void;
+}
+
+const HeadBar: React.FC<HeadBarProps> = ({ onChatOpen }) => {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [query, setQuery] = useState("");
@@ -156,6 +161,18 @@ const HeadBar = () => {
                 className="flex items-center justify-center bg-lime-400 hover:bg-lime-600 text-white rounded-xl px-3 py-2 transition shadow-sm"
               >
                 <BiPlus size={26} />
+              </button>
+
+              {/* 🤖 AI Assistant */}
+              <button
+                onClick={onChatOpen}
+                className="flex items-center rounded-xl px-3 py-2 bg-purple-600 hover:bg-purple-700 transition shadow-sm"
+                title="AI Assistant"
+              >
+                <BiBot size={26} className="text-white" />
+                <span className="hidden sm:inline text-base md:text-lg font-medium text-white ml-2">
+                  AI Assistant
+                </span>
               </button>
 
               {/* 📬 Inbox */}
