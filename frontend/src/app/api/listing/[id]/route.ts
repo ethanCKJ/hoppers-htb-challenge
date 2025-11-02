@@ -3,7 +3,7 @@ import sql from "@/app/lib/postgres_client";
 import { getAuthenticatedUserId } from "@/app/lib/auth_user";
 
 /**
- * Update a listing (e.g., change status to sold/withdrawn)
+ * ✏️ PUT /api/listing/[id] — Update a listing (status or buyer)
  * Only the seller can update their own listing
  */
 export async function PUT(
@@ -18,12 +18,12 @@ export async function PUT(
   const userId = userIdOrResponse;
 
   try {
-    const listingId = (await params).id;
-    const { status, buyer_id } = await request.json();
+    const listingId = params.id;
+    const { status, buyer_id, category } = await request.json();
 
     // Validate status
     const validStatuses = ["active", "reserved", "sold", "withdrawn"];
-    if (!status || !validStatuses.includes(status)) {
+    if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         {
           error: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
@@ -40,10 +40,7 @@ export async function PUT(
     `;
 
     if (listings.length === 0) {
-      return NextResponse.json(
-        { error: "Listing not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
     const listing = listings[0];
@@ -55,18 +52,23 @@ export async function PUT(
       );
     }
 
-    // Update listing
+    // Update listing — category is optional
     const updatedListings = await sql`
       UPDATE listings
       SET
-        status = ${status},
+        status = COALESCE(${status}, status),
+        category = COALESCE(${category}, category),
         buyer_id = ${buyer_id || null},
-        archived_at = ${status === "sold" || status === "withdrawn" ? sql`NOW()` : null}
+        archived_at = CASE
+          WHEN ${status} IN ('sold', 'withdrawn') THEN NOW()
+          ELSE archived_at
+        END,
+        updated_at = NOW()
       WHERE id = ${listingId}
-      RETURNING id, seller_id, title, status, buyer_id, archived_at, updated_at
+      RETURNING id, seller_id, title, description, category, status, buyer_id, archived_at, updated_at
     `;
 
-    // If listing is being closed (sold/withdrawn), close all related conversations
+    // If listing is being closed (sold/withdrawn), close related conversations
     if (status === "sold" || status === "withdrawn") {
       await sql`
         UPDATE conversations
@@ -86,7 +88,7 @@ export async function PUT(
       { status: 200 }
     );
   } catch (e) {
-    console.error(e);
+    console.error("Error updating listing:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -95,14 +97,22 @@ export async function PUT(
 }
 
 /**
- * Get a single listing by ID
+ * 🔍 GET /api/listing/[id] — Get a single listing by ID
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 👈 note: params is a Promise
 ) {
   try {
-    const listingId = (await params).id;
+    // ✅ Await the promise
+    const { id: listingId } = await params;
+
+    if (!listingId) {
+      return NextResponse.json(
+        { error: "Missing listing ID" },
+        { status: 400 }
+      );
+    }
 
     const listings = await sql`
       SELECT
@@ -110,6 +120,7 @@ export async function GET(
         l.seller_id,
         l.title,
         l.description,
+        l.category,
         l.price_pence,
         l.latitude,
         l.longitude,
@@ -140,27 +151,19 @@ export async function GET(
     `;
 
     if (listings.length === 0) {
-      return NextResponse.json(
-        { error: "Listing not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
-    // Increment view count
+    // Increment view count (optional)
     await sql`
       UPDATE listings
       SET views_count = views_count + 1
       WHERE id = ${listingId}
     `;
 
-    return NextResponse.json(
-      {
-        listing: listings[0],
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ listing: listings[0] }, { status: 200 });
   } catch (e) {
-    console.error(e);
+    console.error("Error fetching listing by ID:", e);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

@@ -20,6 +20,7 @@ interface SideBarProps {
   >;
   minPrice: number;
   maxPrice: number;
+  availableCategories: string[]; // ✅ new prop
 }
 
 const SideBar: React.FC<SideBarProps> = ({
@@ -27,17 +28,9 @@ const SideBar: React.FC<SideBarProps> = ({
   setFilters,
   minPrice,
   maxPrice,
+  availableCategories,
 }) => {
   const [categoryQuery, setCategoryQuery] = useState("");
-
-  const availableCategories = [
-    "Electronics",
-    "Books",
-    "Furniture",
-    "Clothing",
-    "Appliances",
-    "Sports",
-  ];
 
   const filteredCategories = availableCategories.filter((cat) =>
     cat.toLowerCase().includes(categoryQuery.toLowerCase())

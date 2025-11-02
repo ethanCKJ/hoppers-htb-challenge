@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React from "react";
 
 interface Listing {
@@ -24,23 +25,25 @@ const ListingsGrid: React.FC<ListingsGridProps> = ({ listings }) => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
         {listings.map((listing) => (
-          <div
-            key={listing.id}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden"
-          >
-            <img
-              src={listing.imageUrl}
-              alt={listing.title}
-              className="w-full h-48 object-cover"
-            />
-            <div className="p-3">
-              <p className="text-lg font-semibold text-gray-800">
-                £{listing.price.toLocaleString()}
-              </p>
-              <p className="text-sm text-gray-700 truncate">{listing.title}</p>
-              <p className="text-xs text-gray-500">{listing.location}</p>
+          <Link href={`/listing/${listing.id}`} key={listing.id}>
+            <div
+              key={listing.id}
+              className="bg-white rounded-xl shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden"
+            >
+              <img
+                src={listing.imageUrl}
+                alt={listing.title}
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-3">
+                <p className="text-lg font-semibold text-gray-800">
+                  £{listing.price.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-700 truncate">{listing.title}</p>
+                <p className="text-xs text-gray-500">{listing.location}</p>
+              </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>
